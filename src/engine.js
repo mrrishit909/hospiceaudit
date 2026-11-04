@@ -5,7 +5,8 @@ import { toDayNumber } from './dates.js';
 import { checkedAdd } from './integers.js';
 import { parseInput, validate, pairKey } from './schema.js';
 import { RULE_PACK, RULE_IDS, RULE_VERSION, SCHEMA_VERSION, ruleById } from './rules.js';
-import { deepClone, deepFreeze, SYNTHETIC_LABEL } from './report.js';
+import { deepClone, deepFreeze } from './report.js';
+import { DATA_ORIGINS, provenanceFields } from './provenance.js';
 
 function makeFinding({ ruleId, episode, document = null, requirement = null, details = {} }) {
   const rule = ruleById(ruleId);
@@ -66,8 +67,14 @@ export function compareFindings(a, b) {
 /**
  * Evaluates validated data and returns a deep-frozen report. Throws if the
  * data does not validate (callers should use runValidation for raw text).
+ *
+ * `options.origin` records how the CALLER obtained the data (see
+ * provenance.js). It defaults to the unverified user-supplied origin; only the
+ * workbench's bundled-fixture control passes DATA_ORIGINS.BUNDLED_FIXTURE.
+ * Nothing inside `data` can influence it.
  */
-export function evaluate(data) {
+export function evaluate(data, { origin = DATA_ORIGINS.USER_SUPPLIED } = {}) {
+  const provenance = provenanceFields(origin);
   const checked = validate(data);
   if (!checked.ok) {
     const error = new Error('evaluate() requires validated data');
@@ -148,8 +155,7 @@ export function evaluate(data) {
     schemaVersion: SCHEMA_VERSION,
     ruleVersion: RULE_VERSION,
     rulePack: deepClone({ ruleVersion: RULE_PACK.ruleVersion, provenance: RULE_PACK.provenance }),
-    syntheticData: true,
-    syntheticDataLabel: SYNTHETIC_LABEL,
+    ...provenance,
     input,
     summary,
     findings,
@@ -157,8 +163,8 @@ export function evaluate(data) {
 }
 
 /** Raw text in; either {ok:false, errors} or {ok:true, report}. Never partial. */
-export function runValidation(text) {
+export function runValidation(text, options = {}) {
   const parsed = parseInput(text);
   if (!parsed.ok) return parsed;
-  return { ok: true, report: evaluate(parsed.data) };
+  return { ok: true, report: evaluate(parsed.data, options) };
 }

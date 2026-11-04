@@ -16,14 +16,26 @@ import {
   buildExport,
   serializeExport,
   findingsToCsv,
-  SYNTHETIC_LABEL,
 } from '../src/index.js';
-import { UI_FIXTURES, fixtureText } from '../fixtures/index.js';
-import { filterFindings, formatDate, timelineGeometry, formatErrors, bufferToHex } from './ui.js';
+import { UI_FIXTURES } from '../fixtures/index.js';
+import {
+  filterFindings,
+  formatDate,
+  timelineGeometry,
+  formatErrors,
+  bufferToHex,
+  sourceFromFixture,
+  sourceFromLocalFile,
+  originShortLabel,
+  originNotice,
+  runStatusText,
+} from './ui.js';
 
 const state = {
   sourceName: '',
   sourceText: '',
+  origin: null, // set only by sourceFromFixture / sourceFromLocalFile
+  loadSeq: 0, // guards the async source hash against a newer load
   data: null, // validated input (parseInput ok)
   errors: [], // validation errors (invalid-file state)
   report: null, // frozen report from evaluate()
@@ -87,56 +99,79 @@ async function hashText(text) {
   }
 }
 
-async function loadText(name, text) {
+// `source` comes from sourceFromFixture or sourceFromLocalFile (ui.js); its
+// origin is fixed by the control used, never by the file's content.
+async function loadSource({ name, text, origin }) {
+  const seq = ++state.loadSeq;
   state.sourceName = name;
   state.sourceText = text;
+  state.origin = origin;
   state.report = null;
   state.selectedId = null;
   state.review = new ReviewLayer();
   state.sourceHash = null;
+  clearRunStatuses();
   const parsed = parseInput(text);
   if (parsed.ok) {
     state.data = parsed.data;
     state.errors = [];
     const n = parsed.data.episodes.length + parsed.data.documents.length + parsed.data.requirements.length;
-    setStatus('load-status', n === 0 ? `${name}: valid but empty (no records). Run the rules to confirm an empty result.` : `${name}: valid input, ${n} records loaded. Inspect them below, then run the rules.`, 'ok');
+    const label = originShortLabel(origin);
+    setStatus('load-status', n === 0 ? `${name}: valid but empty (no records), labelled ${label}. Run the rules to confirm an empty result.` : `${name}: valid input, ${n} records loaded, labelled ${label}. Inspect them below, then run the rules.`, 'ok');
   } else {
     state.data = null;
     state.errors = parsed.errors;
     setStatus('load-status', `${name}: rejected, ${parsed.errors.length} validation error(s). Nothing was processed.`, 'error');
   }
   render();
-  state.sourceHash = await hashText(text);
+  const hash = await hashText(text);
+  if (seq !== state.loadSeq) return; // a newer load replaced this one
+  state.sourceHash = hash;
   renderExport();
+}
+
+// A previous run's status names that run's data origin; never leave it beside new input.
+function clearRunStatuses() {
+  setStatus('run-status', '', 'muted');
+  setStatus('export-status', '', 'muted');
+}
+
+function rejectFile(name, errors, message) {
+  state.loadSeq += 1;
+  state.data = null;
+  state.report = null;
+  state.origin = null;
+  clearRunStatuses();
+  state.errors = errors;
+  setStatus('load-status', `${name}: ${message}`, 'error');
+  render();
 }
 
 async function importFile(file) {
   if (!file) return;
-  setStatus('load-status', `Reading ${file.name}…`, 'muted');
+  setStatus('load-status', `Reading ${file.name} locally…`, 'muted');
   if (file.size > LIMITS.MAX_BYTES) {
-    state.data = null;
-    state.report = null;
-    state.errors = [{ code: 'INPUT_TOO_LARGE', path: '', message: `File is ${file.size} bytes; the limit is ${LIMITS.MAX_BYTES} bytes (1 MiB).` }];
-    setStatus('load-status', `${file.name}: rejected before reading (too large).`, 'error');
-    render();
+    rejectFile(file.name, [{ code: 'INPUT_TOO_LARGE', path: '', message: `File is ${file.size} bytes; the limit is ${LIMITS.MAX_BYTES} bytes (1 MiB).` }], 'rejected before reading (too large).');
     return;
   }
+  let text;
   try {
-    await loadText(file.name, await file.text());
+    text = await file.text();
   } catch (error) {
-    state.errors = [{ code: 'READ_FAILED', path: '', message: String(error?.message || error) }];
-    setStatus('load-status', `${file.name}: could not be read.`, 'error');
-    render();
+    rejectFile(file.name, [{ code: 'READ_FAILED', path: '', message: String(error?.message || error) }], 'could not be read.');
+    return;
   }
+  await loadSource(sourceFromLocalFile(file.name, text));
 }
 
 function runRules() {
   if (!state.data) return;
   try {
-    state.report = evaluate(state.data);
+    // A missing origin falls back to the engine default (unverified user-supplied).
+    state.report = evaluate(state.data, { origin: state.origin ?? undefined });
     state.selectedId = null;
     const n = state.report.summary.findings;
-    setStatus('run-status', n === 0 ? `Rules ran: zero findings under ${state.report.ruleVersion} for this synthetic input. Not a clinical, compliance or billing approval.` : `Rules ran: ${n} finding(s) under ${state.report.ruleVersion}.`, n === 0 ? 'ok' : 'warn');
+    setStatus('run-status', runStatusText(state.report), n === 0 ? 'ok' : 'warn');
   } catch (error) {
     state.report = null;
     state.errors = error.errors || [{ code: error.code || 'ENGINE_ERROR', path: '', message: String(error.message) }];
@@ -162,6 +197,25 @@ function renderErrors() {
     el('p', { text: 'Atomic validation: no partial results were produced.' }),
     el('ul', {}, formatErrors(state.errors).map((line) => el('li', { class: 'mono', text: line }))),
   );
+}
+
+function showOrigin(id, origin) {
+  const node = $(id);
+  if (!origin) {
+    node.hidden = true;
+    node.textContent = '';
+    delete node.dataset.origin;
+    return;
+  }
+  node.hidden = false;
+  node.textContent = originNotice(origin);
+  node.dataset.origin = origin;
+}
+
+function renderOrigin() {
+  showOrigin('source-origin', state.data ? state.origin : null);
+  // Results are labelled from the frozen report, not from the current state.
+  showOrigin('results-origin', state.report ? state.report.dataOrigin : null);
 }
 
 function renderSource() {
@@ -248,7 +302,7 @@ function renderFindings() {
   const shown = filterFindings(state.report.findings, state.filters);
   $('filter-count').textContent = `${shown.length} of ${state.report.findings.length} shown`;
   if (shown.length === 0) {
-    list.replaceChildren(el('li', { class: 'empty', text: state.report.findings.length === 0 ? 'Zero findings for this synthetic input under the demo rule pack. This is not a clinical, compliance or billing approval.' : 'No findings match the current filters.' }));
+    list.replaceChildren(el('li', { class: 'empty', text: state.report.findings.length === 0 ? `Zero findings for this input (${originShortLabel(state.report.dataOrigin)}) under the demo rule pack. This is not a clinical, compliance or billing approval.` : 'No findings match the current filters.' }));
     return;
   }
   list.replaceChildren(
@@ -328,6 +382,7 @@ function renderExport() {
 }
 
 function render() {
+  renderOrigin();
   renderErrors();
   renderSource();
   renderSummary();
@@ -364,12 +419,13 @@ function exportReport(format) {
       notes: state.review.notes,
       decisions: state.review.decisions,
     });
+    const label = originShortLabel(exported.dataOrigin);
     if (format === 'csv') {
       download(findingsToCsv(state.report, exported.review), 'text/csv;charset=utf-8', `hospiceaudit-${slug(state.sourceName)}-findings.csv`);
-      setStatus('export-status', `Exported ${exported.findings.length} finding row(s) as CSV (synthetic data label in every row).`, 'ok');
+      setStatus('export-status', `Exported ${exported.findings.length} finding row(s) as CSV (${label} label in every row).`, 'ok');
     } else {
       download(serializeExport(exported), 'application/json;charset=utf-8', `hospiceaudit-${slug(state.sourceName)}-report.json`);
-      setStatus('export-status', `Exported JSON report: ${exported.findings.length} finding(s), ${Object.keys(exported.review.notes).length} note(s), generated ${exported.generatedAt}.`, 'ok');
+      setStatus('export-status', `Exported JSON report labelled ${label}: ${exported.findings.length} finding(s), ${Object.keys(exported.review.notes).length} note(s), generated ${exported.generatedAt}.`, 'ok');
     }
   } catch (error) {
     setStatus('export-status', `Export failed: ${error.code || error.name}: ${error.message}`, 'error');
@@ -381,7 +437,6 @@ function exportReport(format) {
 // ---------------------------------------------------------------------------
 
 function init() {
-  $('synthetic-label').textContent = SYNTHETIC_LABEL;
   $('limits').textContent = `Limits: ${LIMITS.MAX_BYTES} bytes, ${LIMITS.MAX_RECORDS} records across all arrays, schemaVersion 1, ruleVersion ${RULE_PACK.ruleVersion}.`;
   const fixtureSelect = $('fixture-select');
   fixtureSelect.replaceChildren(...UI_FIXTURES.map((f) => el('option', { value: f.key, text: f.label })));
@@ -391,9 +446,10 @@ function init() {
   };
   fixtureSelect.addEventListener('change', describe);
   describe();
+  // The bundled-fixture control is the only route to the synthetic origin.
   $('load-fixture').addEventListener('click', () => {
-    const f = UI_FIXTURES.find((x) => x.key === fixtureSelect.value);
-    if (f) loadText(`fixture:${f.key}`, fixtureText(f.data));
+    const source = sourceFromFixture(fixtureSelect.value);
+    if (source) loadSource(source);
   });
   $('file').addEventListener('change', (event) => importFile(event.target.files?.[0]));
   $('run-btn').addEventListener('click', runRules);
@@ -408,7 +464,7 @@ function init() {
   $('export-json').addEventListener('click', () => exportReport('json'));
   $('export-csv').addEventListener('click', () => exportReport('csv'));
   render();
-  setStatus('load-status', 'Nothing loaded. Choose a synthetic fixture or import a JSON file.', 'muted');
+  setStatus('load-status', 'Nothing loaded. Choose a bundled synthetic fixture or import a local JSON file.', 'muted');
 }
 
 if (typeof document !== 'undefined') {

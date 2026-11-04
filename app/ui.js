@@ -1,7 +1,46 @@
 // Pure, testable UI helpers. No DOM access here so node:test can import it.
 
 import { parseDate, toDayNumber } from '../src/dates.js';
+import { DATA_ORIGINS, ORIGIN_SHORT_LABELS, provenanceFields } from '../src/provenance.js';
+import { UI_FIXTURES, fixtureText } from '../fixtures/index.js';
 export { csvCell } from '../src/report.js';
+
+// ---------------------------------------------------------------------------
+// Data origin. The origin is decided by WHICH control loaded the data, never
+// by the data: a bundled fixture key is the only route to the synthetic
+// origin, and every local file is unverified whatever its name or content.
+// ---------------------------------------------------------------------------
+
+/** Source for the bundled-fixture control, or null if the key is not bundled. */
+export function sourceFromFixture(key) {
+  const fixture = UI_FIXTURES.find((f) => f.key === key);
+  if (!fixture) return null;
+  return { name: `fixture:${fixture.key}`, text: fixtureText(fixture.data), origin: DATA_ORIGINS.BUNDLED_FIXTURE };
+}
+
+/** Source for a local file the user chose. Always unverified user-supplied. */
+export function sourceFromLocalFile(name, text) {
+  return { name: String(name), text, origin: DATA_ORIGINS.USER_SUPPLIED };
+}
+
+/** Short label ("SYNTHETIC DEMO DATA" / "UNVERIFIED USER-SUPPLIED DATA") for an origin. */
+export function originShortLabel(origin) {
+  return ORIGIN_SHORT_LABELS[provenanceFields(origin).dataOrigin];
+}
+
+/** Full warning/label text for an origin. */
+export function originNotice(origin) {
+  return provenanceFields(origin).dataOriginLabel;
+}
+
+/** Status line after the rules run; the label comes from the report itself. */
+export function runStatusText(report) {
+  const label = originShortLabel(report.dataOrigin);
+  const n = report.summary.findings;
+  return n === 0
+    ? `Rules ran on ${label}: zero findings under ${report.ruleVersion}. Not a clinical, compliance or billing approval.`
+    : `Rules ran on ${label}: ${n} finding(s) under ${report.ruleVersion}.`;
+}
 
 const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 

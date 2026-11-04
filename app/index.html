@@ -38,6 +38,8 @@
   .status[data-tone="warn"] { border-color: var(--amber); color: var(--amber); }
   .status[data-tone="error"] { border-color: var(--clay); color: var(--clay); }
   .status[data-tone="muted"] { color: var(--ink-2); }
+  .origin { margin: .75rem 0 0; padding: .6rem .9rem; font-size: .92rem; border-radius: 4px; border: 1px solid var(--moss); background: var(--moss-soft); color: #1f3a28; }
+  .origin[data-origin="user-supplied-unverified"] { border: 2px solid var(--clay); background: var(--clay-soft); color: #5a1d10; font-weight: 600; }
   .errors { margin-top: .75rem; background: var(--clay-soft); border: 1px solid var(--clay); border-radius: 4px; padding: .75rem 1rem; }
   .errors h3 { margin: 0 0 .25rem; font: 600 1rem var(--serif); color: var(--clay); }
   .errors ul { margin: .5rem 0 0; padding-left: 1.2rem; font-size: .88rem; }
@@ -81,7 +83,7 @@
 <body>
 <header class="masthead">
   <h1>HospiceAudit <small>Bounded review of synthetic hospice episode documentation under the fictional rule pack HA-DEMO-1.</small></h1>
-  <p class="banner" role="note" id="synthetic-label">Synthetic demo data only.</p>
+  <p class="banner" role="note" id="synthetic-label">Demo for synthetic data only. Bundled fixtures are labelled SYNTHETIC DEMO DATA. A local JSON file you import is labelled UNVERIFIED USER-SUPPLIED DATA: its origin is not checked, and the label does not detect or prevent real or patient data. Do not load real patient data.</p>
   <p class="muted small" id="limits"></p>
 </header>
 <main>
@@ -92,17 +94,19 @@
         <select id="fixture-select"></select>
       </label>
       <button type="button" id="load-fixture">Load fixture</button>
-      <label>Or import a JSON file (schemaVersion 1, 1 MiB max)
-        <input type="file" id="file" accept="application/json,.json">
+      <label>Or import a local JSON file (schemaVersion 1, 1 MiB max)
+        <input type="file" id="file" accept="application/json,.json" aria-describedby="file-note">
       </label>
     </div>
     <p class="muted small" id="fixture-desc"></p>
+    <p class="muted small" id="file-note">An imported file is read by this page inside your browser and is not uploaded: the workbench code makes no network calls with it. Its results and exports are labelled UNVERIFIED USER-SUPPLIED DATA whatever the file contains: nothing in a file can mark it synthetic, and the label does not detect or prevent real or patient data.</p>
     <p class="status" id="load-status" role="status" aria-live="polite"></p>
     <div class="errors" id="errors" hidden></div>
   </section>
 
   <section class="step" aria-labelledby="h-source">
     <h2 id="h-source"><span class="n">2</span>Source records</h2>
+    <p class="origin" id="source-origin" role="note" hidden></p>
     <div class="source" id="source"></div>
     <div class="row">
       <button type="button" id="run-btn" disabled>Run HA-DEMO-1 rules</button>
@@ -112,6 +116,7 @@
 
   <section class="step" aria-labelledby="h-results">
     <h2 id="h-results"><span class="n">3</span>Results</h2>
+    <p class="origin" id="results-origin" role="note" hidden></p>
     <div class="chips" id="summary"></div>
     <div class="timelines" id="timelines"></div>
     <div class="work">

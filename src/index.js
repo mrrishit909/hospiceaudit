@@ -17,10 +17,20 @@ export {
 } from './schema.js';
 export { evaluate, runValidation, compareFindings } from './engine.js';
 export {
+  DATA_ORIGINS,
+  USER_SUPPLIED_LABEL,
+  ORIGIN_SHORT_LABELS,
+  ProvenanceError,
+  isDataOrigin,
+  provenanceFields,
+} from './provenance.js';
+export {
   SYNTHETIC_LABEL,
   MAX_NOTE_LENGTH,
   DECISIONS,
   EXPORT_VERSION,
+  LEGACY_EXPORT_VERSION,
+  reportOrigin,
   ExportError,
   ReviewError,
   ReviewLayer,

@@ -2,14 +2,22 @@
 // round-trip helpers. Isomorphic: no node: imports. The engine never reads
 // the clock or hashes input itself; callers inject generatedAt and sourceHash.
 
-export const SYNTHETIC_LABEL =
-  'SYNTHETIC DEMO DATA: fictional records generated for demonstration only. ' +
-  'No real patients, providers, claims or identifiers. Fictional rule pack ' +
-  'HA-DEMO-1 carries no regulatory, legal or clinical authority.';
+import {
+  DATA_ORIGINS,
+  ORIGIN_SHORT_LABELS,
+  SYNTHETIC_LABEL,
+  isDataOrigin,
+  provenanceFields,
+} from './provenance.js';
+
+export { SYNTHETIC_LABEL };
 
 export const MAX_NOTE_LENGTH = 2000;
 export const DECISIONS = Object.freeze(['open', 'confirmed', 'dismissed', 'escalated']);
-export const EXPORT_VERSION = 1;
+// v2: provenance is per report (dataOrigin, syntheticData, dataOriginLabel)
+// instead of v1's unconditional syntheticData:true + syntheticDataLabel.
+export const EXPORT_VERSION = 2;
+export const LEGACY_EXPORT_VERSION = 1;
 
 export class ExportError extends Error {
   constructor(code, message) {
@@ -133,6 +141,20 @@ function toPlainMap(value, label) {
 const ISO_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
 
+/**
+ * Origin recorded on a report by evaluate(). A report without one (for example
+ * built before provenance existed) is treated as unverified user-supplied; a
+ * legacy `syntheticData: true` flag on its own is never trusted.
+ */
+export function reportOrigin(report) {
+  const origin = report?.dataOrigin;
+  if (origin === undefined) return DATA_ORIGINS.USER_SUPPLIED;
+  if (!isDataOrigin(origin)) {
+    throw new ExportError('EXPORT_INVALID_ORIGIN', `Report has an unknown data origin: ${String(origin)}`);
+  }
+  return origin;
+}
+
 export function buildExport(report, options = {}) {
   if (
     !report ||
@@ -144,6 +166,8 @@ export function buildExport(report, options = {}) {
   ) {
     throw new ExportError('EXPORT_INVALID_REPORT', 'Export requires a validated report object');
   }
+  // Provenance comes only from the report; options cannot override it.
+  const provenance = provenanceFields(reportOrigin(report));
   const { generatedAt, sourceHash = null, notes, decisions } = options;
   if (typeof generatedAt !== 'string' || !ISO_TIMESTAMP_RE.test(generatedAt)) {
     throw new ExportError(
@@ -181,8 +205,9 @@ export function buildExport(report, options = {}) {
   return {
     exportVersion: EXPORT_VERSION,
     product: 'HospiceAudit',
-    syntheticData: true,
-    syntheticDataLabel: SYNTHETIC_LABEL,
+    dataOrigin: provenance.dataOrigin,
+    syntheticData: provenance.syntheticData,
+    dataOriginLabel: provenance.dataOriginLabel,
     schemaVersion: report.schemaVersion,
     ruleVersion: report.ruleVersion,
     rulePack: deepClone(report.rulePack),
@@ -216,7 +241,20 @@ export function serializeExport(exported) {
     .replace(PARAGRAPH_SEPARATOR_RE, BACKSLASH + 'u2029');
 }
 
-/** Reparses an export produced by serializeExport and checks its shape. */
+function hasV2Provenance(parsed) {
+  if (!isDataOrigin(parsed.dataOrigin)) return false;
+  const expected = provenanceFields(parsed.dataOrigin);
+  return parsed.syntheticData === expected.syntheticData && parsed.dataOriginLabel === expected.dataOriginLabel;
+}
+
+/**
+ * Reparses an export produced by serializeExport and checks its shape.
+ * Accepts v2 (current) and v1 (legacy) exports. A v2 export must carry a known
+ * dataOrigin with a matching syntheticData flag and label. Provenance read
+ * back from a file is a record of what the producing workbench saw, not proof:
+ * the file is not signed and can be edited. v1 exports stated
+ * syntheticData:true for every input, so a v1 flag says nothing about origin.
+ */
 export function reparseExport(text) {
   let parsed;
   try {
@@ -224,14 +262,16 @@ export function reparseExport(text) {
   } catch (error) {
     throw new ExportError('EXPORT_REPARSE_FAILED', String(error && error.message));
   }
-  if (
-    !isPlainObject(parsed) ||
-    parsed.exportVersion !== EXPORT_VERSION ||
-    !Array.isArray(parsed.findings) ||
-    !isPlainObject(parsed.summary) ||
-    !isPlainObject(parsed.input) ||
-    parsed.syntheticData !== true
-  ) {
+  const baseOk =
+    isPlainObject(parsed) &&
+    Array.isArray(parsed.findings) &&
+    isPlainObject(parsed.summary) &&
+    isPlainObject(parsed.input);
+  const versionOk =
+    baseOk &&
+    ((parsed.exportVersion === EXPORT_VERSION && hasV2Provenance(parsed)) ||
+      (parsed.exportVersion === LEGACY_EXPORT_VERSION && parsed.syntheticData === true));
+  if (!versionOk) {
     throw new ExportError('EXPORT_SHAPE_INVALID', 'Reparsed export does not have the expected shape');
   }
   return parsed;
@@ -263,10 +303,12 @@ export const CSV_COLUMNS = Object.freeze([
   'message',
   'decision',
   'note',
-  'syntheticDataLabel',
+  'dataOriginLabel',
 ]);
 
+/** Findings as CSV; every row carries the report's own data-origin label. */
 export function findingsToCsv(report, review = {}) {
+  const originLabel = ORIGIN_SHORT_LABELS[reportOrigin(report)];
   const notes = toPlainMap(review.notes, 'notes');
   const decisions = toPlainMap(review.decisions, 'decisions');
   const lines = [CSV_COLUMNS.map(csvCell).join(',')];
@@ -282,7 +324,7 @@ export function findingsToCsv(report, review = {}) {
         f.message,
         decisions[f.id] ?? 'open',
         notes[f.id] ?? '',
-        'SYNTHETIC DEMO DATA',
+        originLabel,
       ]
         .map(csvCell)
         .join(','),

@@ -72,12 +72,41 @@ episodes 3 / required pairs 6 / present pairs 5 / documents 5 / affected episode
 The report is **deep-frozen** (mutation throws in strict mode) and contains:
 
 - `schemaVersion`, `ruleVersion`, `rulePack` (`{ ruleVersion, provenance }` — provenance states the pack is fictional and names its source spec),
-- `syntheticData: true` and `syntheticDataLabel`,
+- `dataOrigin`, `syntheticData` and `dataOriginLabel` (see *Data origin* below),
 - `input` — an untouched snapshot of the validated input,
 - `summary` — `episodes, requiredPairs, presentPairs, documents, findings, countsByRule, affectedEpisodes`,
 - `findings[]` — sorted by rule id then entity ids (code-unit order); each has `id, ruleId, ruleVersion, title, message, episodeId, documentId, kind, entityIds` and `evidence` with the cited `episode`, `document`, `requirement` records plus `daysAfterBilling` / `daysBeforeStart` where relevant.
 
 Output is deterministic: input array order does not change findings, and two runs are byte-identical.
+
+## Data origin
+
+`evaluate(data, { origin })` / `runValidation(text, { origin })` record how the
+**caller** obtained the input; nothing inside the input can set or change it.
+
+| `dataOrigin` | When | `syntheticData` | Label (JSON `dataOriginLabel`; CSV short form) |
+|---|---|---|---|
+| `bundled-synthetic-fixture` | Workbench "Load fixture" control, from this build's `fixtures/` registry only | `true` | `SYNTHETIC DEMO DATA: …` |
+| `user-supplied-unverified` | Default for every other caller, including any local JSON file | `false` | `UNVERIFIED USER-SUPPLIED DATA: …` |
+
+- The input schema has no provenance key: a file that adds `syntheticData`, `dataOrigin` or a label at root is rejected (`UNKNOWN_KEY`). Label text inside IDs, a fixture-like file name, or a file byte-identical to a bundled fixture still gives `user-supplied-unverified`.
+- The user-supplied label states that the origin is unverified and that the label **does not detect, block or prevent real or patient data**. It is a disclosure, not a control. Do not load real patient data.
+- Local files are read in the browser with `File.text()`. The shipped code (`app/`, `src/`, `fixtures/`) has no network API calls, which `tests/provenance.test.js` checks, and the served/built CSP sets `connect-src 'none'` and `form-action 'none'`. The file is not uploaded.
+- `buildExport` and `findingsToCsv` take the origin from the report only. Export options cannot override it. A report object with no `dataOrigin` counts as unverified, and a bare `syntheticData: true` is not trusted.
+- An unknown origin throws `ProvenanceError` `ORIGIN_INVALID` (engine) or `ExportError` `EXPORT_INVALID_ORIGIN` (export).
+
+**Versioning.** `schemaVersion` (1) and `ruleVersion` (`HA-DEMO-1`) are
+unchanged because the input contract and rules did not change. `exportVersion`
+went from **1 to 2** because export semantics and fields changed. v1 set
+`syntheticData: true` and `syntheticDataLabel` on every export whatever the input
+was. v2 replaces `syntheticDataLabel` with `dataOrigin` + `dataOriginLabel`, and
+`syntheticData` is `true` only for bundled fixtures. The CSV column
+`syntheticDataLabel` is now `dataOriginLabel`. `reparseExport` still accepts v1
+files so old exports remain readable. Treat a v1 `syntheticData` flag as
+meaningless, because v1 set it for user files too. Provenance read back from any
+export file records what the producing workbench saw. It is not proof: export
+files are unsigned and can be edited. `reparseExport` rejects v2 files whose
+`syntheticData` or label contradicts their `dataOrigin`.
 
 ## Review layer and exports
 
@@ -85,14 +114,15 @@ Reviewer notes (strings, at most 2,000 characters) and decisions
 (`open | confirmed | dismissed | escalated`) live in a `ReviewLayer` outside the
 frozen report; adding them leaves the validation output byte-identical.
 
-- **JSON** — `buildExport(report, { generatedAt, sourceHash, notes, decisions })` then `serializeExport(...)`. The export carries `exportVersion: 1`, the synthetic label, rule pack provenance, the input snapshot, summary, findings and `review`. The serializer escapes `</` as `<\/` and U+2028/U+2029 so the text is inert inside HTML; `reparseExport(text)` parses it back and checks the shape. The engine never reads the clock or hashes input itself; callers inject `generatedAt` (ISO-8601 UTC) and an optional SHA-256 `sourceHash`.
-- **CSV** — `findingsToCsv(report, review)`: RFC 4180 quoting, CRLF line ends, formula-leading cells neutralised, a `SYNTHETIC DEMO DATA` label on every row.
+- **JSON** — `buildExport(report, { generatedAt, sourceHash, notes, decisions })` then `serializeExport(...)`. The export carries `exportVersion: 2`, the report's data-origin fields and label, rule pack provenance, the input snapshot, summary, findings and `review`. The serializer escapes `</` as `<\/` and U+2028/U+2029 so the text is inert inside HTML; `reparseExport(text)` parses it back and checks the shape. The engine never reads the clock or hashes input itself; callers inject `generatedAt` (ISO-8601 UTC) and an optional SHA-256 `sourceHash`.
+- **CSV** — `findingsToCsv(report, review)`: RFC 4180 quoting, CRLF line ends, formula-leading cells neutralised, a `dataOriginLabel` column on every row (`SYNTHETIC DEMO DATA` or `UNVERIFIED USER-SUPPLIED DATA`).
 
 ## Workbench (`app/`)
 
 `app/index.html` + `app/app.js` wire the real engine from `src/` into the
-journey: load a named synthetic fixture or import a JSON file (size checked
-before reading) → inspect the source records → run the rules → read the
+journey: load a named synthetic fixture or import a local JSON file (size
+checked before reading, read in the browser, labelled unverified user-supplied
+in the source and results panels, run status and exports) → inspect the source records → run the rules → read the
 summary and per-episode chronology strips → filter findings by rule, kind or
 entity text → open a finding to see its cited records, computed evidence and
 rule pack provenance → record a decision and note → export JSON or CSV.
@@ -104,7 +134,7 @@ import.
 ## Limitations
 
 - Demonstration slice only. Four fictional rules, two document kinds, one rule version. No claim of regulatory or clinical correctness.
-- The workbench has **not** been verified in a browser in this session (no browser tooling was available): rendering, keyboard journey, mobile layout and download behaviour are unverified. It was syntax-checked and imported under Node only.
+- An independent black-box browser check of the built `dist/` ran at 1280x900 and 390x844. It covered fixture and local JSON origins, the JSON/CSV origin labels, rejection of self-asserted provenance, the evidence → note → decision → export flow, and the CSP response headers. It found no network, console or CSP errors and no horizontal overflow on mobile. A full keyboard-only journey was not part of that check. This is verification evidence only: it is **not** product acceptance and **not** a deployment.
 - No persistence: notes and decisions live in memory until exported.
 - Exports are downloaded files; the workbench does not yet reimport an exported report (the round-trip is covered by `tests/review-export.test.js` and `tests/adversarial.test.js`).
 - The static server is a local development convenience, not a hardened production server.

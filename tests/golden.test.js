@@ -59,8 +59,15 @@ test('golden oracle: the input snapshot is preserved untouched and no money figu
   for (const word of ['exposure', 'cents', 'amount', 'usd', '$']) {
     assert.ok(!text.includes(word), `report must not contain "${word}"`);
   }
-  assert.equal(report.syntheticData, true);
-  assert.match(report.syntheticDataLabel, /SYNTHETIC DEMO DATA/);
+  // Raw text gives no provenance: even the golden fixture's exact text is
+  // unverified unless the caller loaded it through the bundled-fixture route.
+  assert.equal(report.dataOrigin, 'user-supplied-unverified');
+  assert.equal(report.syntheticData, false);
+  assert.match(report.dataOriginLabel, /^UNVERIFIED USER-SUPPLIED DATA/);
+  const bundled = runValidation(fixtureText(GOLDEN), { origin: 'bundled-synthetic-fixture' }).report;
+  assert.equal(bundled.syntheticData, true);
+  assert.match(bundled.dataOriginLabel, /^SYNTHETIC DEMO DATA/);
+  assert.deepEqual(bundled.findings, report.findings, 'origin never changes findings');
 });
 
 test('clean variant: zero findings and six present pairs', () => {

@@ -13,6 +13,7 @@ import {
   csvCell,
   MAX_NOTE_LENGTH,
   SYNTHETIC_LABEL,
+  DATA_ORIGINS,
 } from '../src/index.js';
 import { GOLDEN, fixtureText } from '../fixtures/index.js';
 
@@ -50,7 +51,7 @@ test('review layer: notes are bounded and decisions are constrained', () => {
 });
 
 test('export roundtrip: JSON.stringify -> reparse deep-equals live findings and summary', () => {
-  const { report } = runValidation(TEXT);
+  const { report } = runValidation(TEXT, { origin: DATA_ORIGINS.BUNDLED_FIXTURE });
   const review = new ReviewLayer();
   review.setNote('HA04:EP-3', 'Billing date typed before episode start in the synthetic feed.');
   review.setDecision('HA04:EP-3', 'confirmed');
@@ -69,8 +70,11 @@ test('export roundtrip: JSON.stringify -> reparse deep-equals live findings and 
   assert.equal(back.ruleVersion, 'HA-DEMO-1');
   assert.equal(back.rulePack.provenance.kind, 'fictional-demo-configuration');
   assert.equal(back.rulePack.provenance.source, 'atlas/docs/specs/HOSPICEAUDIT-VERTICAL-SLICE.md');
+  assert.equal(back.exportVersion, 2);
+  assert.equal(back.dataOrigin, DATA_ORIGINS.BUNDLED_FIXTURE);
   assert.equal(back.syntheticData, true);
-  assert.equal(back.syntheticDataLabel, SYNTHETIC_LABEL);
+  assert.equal(back.dataOriginLabel, SYNTHETIC_LABEL);
+  assert.equal('syntheticDataLabel' in back, false, 'v1 field replaced by dataOriginLabel');
   assert.equal(back.generatedAt, '2026-11-04T02:00:00Z');
   assert.equal(back.sourceHash, HASH);
   assert.match(back.sourceHash, /^[0-9a-f]{64}$/);
@@ -110,13 +114,13 @@ test('csv: RFC 4180 quoting and formula neutralisation', () => {
   assert.equal(csvCell('@cmd'), '"\'@cmd"');
   assert.equal(csvCell('\tx'), '"\'\tx"');
   assert.equal(csvCell('\rx'), '"\'\rx"');
-  const { report } = runValidation(TEXT);
+  const { report } = runValidation(TEXT, { origin: DATA_ORIGINS.BUNDLED_FIXTURE });
   const csv = findingsToCsv(report, { notes: { 'HA02:D-4': '=HYPERLINK("x")' }, decisions: { 'HA02:D-4': 'dismissed' } });
   const lines = csv.split('\r\n');
-  assert.equal(lines[0], 'findingId,ruleId,ruleVersion,episodeId,documentId,kind,message,decision,note,syntheticDataLabel');
+  assert.equal(lines[0], 'findingId,ruleId,ruleVersion,episodeId,documentId,kind,message,decision,note,dataOriginLabel');
   assert.equal(lines.length, 6, 'header + 4 rows + trailing newline');
   const ha02 = lines.find((l) => l.startsWith('HA02:D-4'));
   assert.ok(ha02.includes('"\'=HYPERLINK(""x"")"'));
   assert.ok(ha02.includes(',dismissed,'));
-  assert.ok(ha02.endsWith('SYNTHETIC DEMO DATA'));
+  assert.ok(ha02.endsWith(',SYNTHETIC DEMO DATA'));
 });
