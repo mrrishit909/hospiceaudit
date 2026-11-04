@@ -383,7 +383,7 @@ function exportReport(format) {
 function init() {
   $('synthetic-label').textContent = SYNTHETIC_LABEL;
   $('limits').textContent = `Limits: ${LIMITS.MAX_BYTES} bytes, ${LIMITS.MAX_RECORDS} records across all arrays, schemaVersion 1, ruleVersion ${RULE_PACK.ruleVersion}.`;
-  const fixtureSelect = $('fixture');
+  const fixtureSelect = $('fixture-select');
   fixtureSelect.replaceChildren(...UI_FIXTURES.map((f) => el('option', { value: f.key, text: f.label })));
   const describe = () => {
     const f = UI_FIXTURES.find((x) => x.key === fixtureSelect.value);
