@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>HospiceAudit workbench — synthetic demo</title>
+<style>
+  /* Case-ledger direction: paper, ink, one clay accent for flagged chronology. */
+  :root {
+    --paper: #f6f1e7; --paper-2: #efe7d8; --ink: #1c2330; --ink-2: #4a5263; --rule: #cdbfa6;
+    --clay: #a8402a; --clay-soft: #f1d9d1; --moss: #3f6b4d; --moss-soft: #dbe7dd; --amber: #8a6a1f; --amber-soft: #f3e7c2;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--paper); color: var(--ink); font: 16px/1.5 var(--sans); }
+  body { margin: 0; }
+  header.masthead { border-bottom: 3px double var(--rule); padding: 1.5rem clamp(1rem, 4vw, 3rem) 1.25rem; display: grid; gap: .5rem; }
+  header h1 { font: 700 clamp(1.8rem, 4vw, 2.6rem)/1.05 var(--serif); letter-spacing: -.01em; margin: 0; }
+  header h1 small { display: block; font: italic 400 1rem/1.4 var(--serif); color: var(--ink-2); margin-top: .35rem; }
+  .banner { background: var(--amber-soft); border: 1px solid var(--amber); color: #3d2f0a; padding: .6rem .9rem; font-size: .92rem; border-radius: 4px; }
+  main { display: grid; gap: 1.5rem; padding: 1.5rem clamp(1rem, 4vw, 3rem) 3rem; max-width: 1400px; margin: 0 auto; }
+  section.step { background: #fffdf8; border: 1px solid var(--rule); border-radius: 6px; padding: 1rem 1.25rem 1.25rem; }
+  section.step > h2 { font: 600 1.15rem/1.3 var(--serif); margin: 0 0 .75rem; display: flex; gap: .6rem; align-items: baseline; }
+  section.step > h2 .n { font: 700 .8rem/1 var(--mono); color: var(--paper); background: var(--ink); border-radius: 999px; padding: .3rem .55rem; }
+  .row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+  label { font-size: .85rem; color: var(--ink-2); display: grid; gap: .25rem; }
+  select, input[type="search"], textarea { font: inherit; padding: .45rem .6rem; border: 1px solid var(--rule); border-radius: 4px; background: #fff; color: var(--ink); min-height: 2.5rem; }
+  textarea { width: 100%; font-family: var(--sans); }
+  button { font: 600 .95rem var(--sans); padding: .55rem 1rem; min-height: 2.5rem; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--clay); outline-offset: 2px; }
+  .status { margin: .75rem 0 0; font-size: .92rem; padding-left: .75rem; border-left: 4px solid var(--rule); min-height: 1.4rem; }
+  .status[data-tone="ok"] { border-color: var(--moss); color: var(--moss); }
+  .status[data-tone="warn"] { border-color: var(--amber); color: var(--amber); }
+  .status[data-tone="error"] { border-color: var(--clay); color: var(--clay); }
+  .status[data-tone="muted"] { color: var(--ink-2); }
+  .origin { margin: .75rem 0 0; padding: .6rem .9rem; font-size: .92rem; border-radius: 4px; border: 1px solid var(--moss); background: var(--moss-soft); color: #1f3a28; }
+  .origin[data-origin="user-supplied-unverified"] { border: 2px solid var(--clay); background: var(--clay-soft); color: #5a1d10; font-weight: 600; }
+  .errors { margin-top: .75rem; background: var(--clay-soft); border: 1px solid var(--clay); border-radius: 4px; padding: .75rem 1rem; }
+  .errors h3 { margin: 0 0 .25rem; font: 600 1rem var(--serif); color: var(--clay); }
+  .errors ul { margin: .5rem 0 0; padding-left: 1.2rem; font-size: .88rem; }
+  .mono { font-family: var(--mono); font-size: .88em; }
+  #hash { overflow-wrap: anywhere; } /* 64-char SHA-256 has no break points; let it wrap on narrow viewports */
+  .muted { color: var(--ink-2); } .small { font-size: .85rem; } .empty { color: var(--ink-2); font-style: italic; margin: .25rem 0; }
+  table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .92rem; }
+  caption { text-align: left; font: 600 .95rem var(--serif); padding: .25rem 0; color: var(--ink-2); }
+  th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid var(--paper-2); vertical-align: top; word-break: break-word; }
+  th { font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); }
+  table.kv th { text-transform: none; letter-spacing: 0; width: 9rem; }
+  .source { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .chip { display: grid; padding: .5rem .8rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); min-width: 7.5rem; }
+  .chip-v { font-size: 1.4rem; font-weight: 700; } .chip-l { font-size: .75rem; color: var(--ink-2); text-transform: uppercase; letter-spacing: .05em; }
+  .timelines h3 { font: 600 1rem var(--serif); margin: 1.25rem 0 .25rem; }
+  .strip { margin: .75rem 0; } .strip-head { font-size: .9rem; }
+  .track { position: relative; height: 26px; background: var(--paper-2); border-radius: 3px; margin: .35rem 0 .2rem; overflow: visible; }
+  .range { position: absolute; top: 9px; height: 8px; background: var(--ink-2); border-radius: 2px; }
+  .billing { position: absolute; top: 0; height: 26px; width: 2px; background: var(--ink); transform: translateX(-1px); }
+  .billing::after { content: "bill"; position: absolute; top: -1.1em; left: 3px; font: .65rem var(--mono); color: var(--ink-2); }
+  .billing.bad { background: var(--clay); }
+  .doc { position: absolute; top: 6px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--moss); background: var(--moss); transform: translateX(-7px); }
+  .doc.carePlan { background: #fff; }
+  .doc.bad { border-color: var(--clay); background: var(--clay); } .doc.carePlan.bad { background: var(--clay-soft); }
+  .doc.margin { left: auto; right: -22px; border-style: dashed; border-color: var(--clay); background: transparent; }
+  .work { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  ul.findings { list-style: none; margin: .75rem 0 0; padding: 0; display: grid; gap: .5rem; }
+  button.finding { width: 100%; text-align: left; display: grid; grid-template-columns: auto 1fr auto; gap: .25rem .6rem; align-items: center; background: #fff; color: var(--ink); border: 1px solid var(--rule); padding: .6rem .75rem; font-weight: 400; }
+  button.finding .msg { grid-column: 1 / -1; font-size: .9rem; color: var(--ink-2); }
+  button.finding.selected { border-color: var(--ink); box-shadow: inset 4px 0 0 var(--ink); }
+  .badge { font: 700 .72rem/1 var(--mono); padding: .3rem .4rem; border-radius: 3px; color: #fff; background: var(--ink-2); }
+  .badge.HA01 { background: var(--amber); } .badge.HA02 { background: var(--ink-2); } .badge.HA03, .badge.HA04 { background: var(--clay); }
+  .decision { font-size: .75rem; color: var(--ink-2); }
+  .evidence h3 { font: 600 1.05rem var(--serif); margin: 0 0 .25rem; } .evidence .title { font-weight: 600; margin: .25rem 0; }
+  .review { margin-top: 1rem; display: grid; gap: .5rem; border-top: 1px dashed var(--rule); padding-top: .75rem; }
+  footer { padding: 1rem clamp(1rem, 4vw, 3rem) 2rem; color: var(--ink-2); font-size: .85rem; border-top: 1px solid var(--rule); }
+  @media (max-width: 900px) { .work { grid-template-columns: 1fr; } .row { align-items: stretch; } .row > * { width: 100%; } button.finding { grid-template-columns: auto 1fr; } .decision { grid-column: 1 / -1; } }
+  @media (prefers-reduced-motion: no-preference) { button.finding { transition: box-shadow .15s ease, border-color .15s ease; } }
+</style>
+</head>
+<body>
+<header class="masthead">
+  <h1>HospiceAudit <small>Bounded review of synthetic hospice episode documentation under the fictional rule pack HA-DEMO-1.</small></h1>
+  <p class="banner" role="note" id="synthetic-label">Demo for synthetic data only. Bundled fixtures are labelled SYNTHETIC DEMO DATA. A local JSON file you import is labelled UNVERIFIED USER-SUPPLIED DATA: its origin is not checked, and the label does not detect or prevent real or patient data. Do not load real patient data.</p>
+  <p class="muted small" id="limits"></p>
+</header>
+<main>
+  <section class="step" aria-labelledby="h-load">
+    <h2 id="h-load"><span class="n">1</span>Load input</h2>
+    <div class="row">
+      <label>Named synthetic fixture
+        <select id="fixture-select"></select>
+      </label>
+      <button type="button" id="load-fixture">Load fixture</button>
+      <label>Or import a local JSON file (schemaVersion 1, 1 MiB max)
+        <input type="file" id="file" accept="application/json,.json" aria-describedby="file-note">
+      </label>
+    </div>
+    <p class="muted small" id="fixture-desc"></p>
+    <p class="muted small" id="file-note">An imported file is read by this page inside your browser and is not uploaded: the workbench code makes no network calls with it. Its results and exports are labelled UNVERIFIED USER-SUPPLIED DATA whatever the file contains: nothing in a file can mark it synthetic, and the label does not detect or prevent real or patient data.</p>
+    <p class="status" id="load-status" role="status" aria-live="polite"></p>
+    <div class="errors" id="errors" hidden></div>
+  </section>
+
+  <section class="step" aria-labelledby="h-source">
+    <h2 id="h-source"><span class="n">2</span>Source records</h2>
+    <p class="origin" id="source-origin" role="note" hidden></p>
+    <div class="source" id="source"></div>
+    <div class="row">
+      <button type="button" id="run-btn" disabled>Run HA-DEMO-1 rules</button>
+    </div>
+    <p class="status" id="run-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="step" aria-labelledby="h-results">
+    <h2 id="h-results"><span class="n">3</span>Results</h2>
+    <p class="origin" id="results-origin" role="note" hidden></p>
+    <div class="chips" id="summary"></div>
+    <div class="timelines" id="timelines"></div>
+    <div class="work">
+      <div>
+        <div class="row">
+          <label>Rule <select id="filter-rule"></select></label>
+          <label>Kind <select id="filter-kind"></select></label>
+          <label>Entity text <input type="search" id="filter-query" placeholder="EP-3, D-4, carePlan…"></label>
+        </div>
+        <p class="muted small" id="filter-count" aria-live="polite"></p>
+        <ul class="findings" id="findings" aria-label="Findings"></ul>
+      </div>
+      <div class="evidence" id="evidence" tabindex="-1" aria-label="Finding evidence and review"></div>
+    </div>
+  </section>
+
+  <section class="step" aria-labelledby="h-export">
+    <h2 id="h-export"><span class="n">4</span>Export</h2>
+    <div class="row">
+      <button type="button" id="export-json" disabled>Export JSON report</button>
+      <button type="button" id="export-csv" class="secondary" disabled>Export findings CSV</button>
+    </div>
+    <p class="muted small mono" id="hash"></p>
+    <p class="status" id="export-status" role="status" aria-live="polite"></p>
+  </section>
+</main>
+<footer>
+  Demonstration slice. HA-DEMO-1 is a fictional documentation contract: it asserts nothing about Medicare, CMS or any regulator, and makes no eligibility, diagnosis, treatment, entitlement or financial determination. Not production software; qualified expert, privacy, security and legal review precede any real-world use.
+</footer>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
