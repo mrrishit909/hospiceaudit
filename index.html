@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="HospiceAudit: a demonstration that checks synthetic hospice episode records against HA-DEMO-1, a fictional documentation rule pack, and leaves every decision to a human reviewer.">
+<title>HospiceAudit: episode review folio (synthetic demo)</title>
+<link rel="stylesheet" href="app/landing.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <p class="mark"><span class="mark-name">HospiceAudit</span> <span class="mark-folio">Folio HA-DEMO-1</span></p>
+  <nav aria-label="Sections">
+    <ul>
+      <li><a href="#exhibit">Exhibit</a></li>
+      <li><a href="#workflow">Workflow</a></li>
+      <li><a href="#rules">Rules</a></li>
+      <li><a href="#limits">Limits</a></li>
+      <li><a class="bar-cta" href="app/">Open workbench</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="h-hero">
+    <div class="hero-text">
+      <p class="eyebrow">Episode review folio · demonstration slice</p>
+      <h1 id="h-hero">Every finding sits on the record that raised it.</h1>
+      <p class="lede">HospiceAudit checks <strong>synthetic</strong> hospice episode records against HA-DEMO-1, a fictional four-rule documentation contract. Each finding cites the episode, document or requirement behind it. A human reviewer records the decision.</p>
+      <div class="cta-row">
+        <a class="cta" href="app/">Open the workbench</a>
+        <p class="cta-note">Opens with the bundled synthetic fixtures. Nothing loads until you choose one, and every result still needs human review.</p>
+      </div>
+    </div>
+    <p class="stamp" role="note" id="synthetic-label"><strong>SYNTHETIC DEMO DATA.</strong> HA-DEMO-1 is fictional. It asserts nothing about Medicare, CMS or any regulator, and makes no eligibility, diagnosis, treatment, entitlement, financial or compliance determination. Do not load real patient data.</p>
+  </section>
+
+  <section class="exhibit" id="exhibit" aria-labelledby="h-exhibit">
+    <header class="exhibit-head">
+      <h2 id="h-exhibit"><span class="plate">Exhibit A</span> The golden fixture, episode by episode</h2>
+      <p class="caption">Transcribed by hand from the <code>GOLDEN</code> fixture in <code>fixtures/index.js</code>. This page is static text and does not run the engine. Dates are calendar days in 2026. <strong>SYNTHETIC DEMO DATA:</strong> no real patients or providers.</p>
+      <p class="legend"><span class="key key-cert" aria-hidden="true"></span>certification <span class="key key-care" aria-hidden="true"></span>carePlan <span class="key key-bill" aria-hidden="true"></span>billing date (fixture field) <span class="key key-flag" aria-hidden="true"></span>cited by a finding</p>
+    </header>
+
+    <div class="axis" aria-hidden="true">
+      <span style="--at:0">Jan</span><span style="--at:34.44">Feb</span><span style="--at:65.56">Mar</span>
+    </div>
+
+    <article class="leaf" aria-labelledby="h-ep1">
+      <header class="leaf-head">
+        <h3 id="h-ep1">EP-1</h3>
+        <p>1 Jan to 31 Jan · billing 1 Feb</p>
+        <p class="req">Requires certification and carePlan</p>
+      </header>
+      <ol class="events" style="--from:0;--to:34.44" aria-label="EP-1 records in date order">
+        <li class="ev edge start" style="--at:0"><time datetime="2026-01-01">1 Jan</time> <span class="what">Episode starts</span></li>
+        <li class="ev doc cert" style="--at:0.56" id="r-D-1"><time datetime="2026-01-01">1 Jan</time> <span class="what"><b>D-1</b> <span class="kind">certification signed</span></span></li>
+        <li class="ev doc care lane2" style="--at:1.67" id="r-D-2"><time datetime="2026-01-02">2 Jan</time> <span class="what"><b>D-2</b> <span class="kind">carePlan signed</span></span></li>
+        <li class="ev edge end" style="--at:34.44"><time datetime="2026-01-31">31 Jan</time> <span class="what">Episode ends</span></li>
+        <li class="ev bill" style="--at:35"><time datetime="2026-02-01">1 Feb</time> <span class="what">Billing date</span></li>
+      </ol>
+      <div class="margin">
+        <h4>Reviewer margin</h4>
+        <p class="clear">No HA-DEMO-1 findings for EP-1. This covers four fictional rules only. It is not an approval.</p>
+      </div>
+    </article>
+
+    <article class="leaf" aria-labelledby="h-ep2">
+      <header class="leaf-head">
+        <h3 id="h-ep2">EP-2</h3>
+        <p>1 Feb to 28 Feb · billing 15 Feb</p>
+        <p class="req">Requires certification and carePlan</p>
+      </header>
+      <ol class="events" style="--from:34.44;--to:65.56" aria-label="EP-2 records in date order">
+        <li class="ev edge start" style="--at:34.44"><time datetime="2026-02-01">1 Feb</time> <span class="what">Episode starts</span></li>
+        <li class="ev bill" style="--at:50.56"><time datetime="2026-02-15">15 Feb</time> <span class="what">Billing date</span></li>
+        <li class="ev doc cert flag" style="--at:51.67" id="r-D-3"><time datetime="2026-02-16">16 Feb</time> <span class="what"><b>D-3</b> <span class="kind">certification signed</span></span> <a class="tag" href="#f-HA03-D-3">HA03</a></li>
+        <li class="ev edge end" style="--at:65.56"><time datetime="2026-02-28">28 Feb</time> <span class="what">Episode ends</span></li>
+      </ol>
+      <div class="margin">
+        <h4>Reviewer margin</h4>
+        <ol class="notes">
+          <li class="note" id="f-HA01-EP-2-carePlan">
+            <p class="fid"><span class="tag">HA01</span> <code>HA01:EP-2:carePlan</code></p>
+            <p class="msg">Episode EP-2 requires a carePlan document but none exists.</p>
+            <p class="aside">Cites episode EP-2 and its carePlan requirement. No document exists to place on the strip.</p>
+            <p class="dec">Decision: <span>open</span></p>
+          </li>
+          <li class="note" id="f-HA03-D-3">
+            <p class="fid"><span class="tag">HA03</span> <code>HA03:D-3</code></p>
+            <p class="msg">Document D-3 (certification) was signed on 2026-02-16, 1 calendar day(s) after episode EP-2 billing date 2026-02-15.</p>
+            <p class="aside"><a href="#r-D-3">Show D-3 on the strip</a></p>
+            <p class="dec">Decision: <span>open</span></p>
+          </li>
+        </ol>
+      </div>
+    </article>
+
+    <article class="leaf" aria-labelledby="h-ep3">
+      <header class="leaf-head">
+        <h3 id="h-ep3">EP-3</h3>
+        <p>1 Mar to 31 Mar · billing 28 Feb</p>
+        <p class="req">Requires certification and carePlan</p>
+      </header>
+      <ol class="events" style="--from:65.56;--to:100" aria-label="EP-3 records in date order">
+        <li class="ev doc care" style="--at:63.89" id="r-D-5"><time datetime="2026-02-27">27 Feb</time> <span class="what"><b>D-5</b> <span class="kind">carePlan signed</span></span></li>
+        <li class="ev bill flag" style="--at:65" id="r-EP-3-billing"><time datetime="2026-02-28">28 Feb</time> <span class="what">Billing date</span> <a class="tag" href="#f-HA04-EP-3">HA04</a></li>
+        <li class="ev edge start" style="--at:65.56"><time datetime="2026-03-01">1 Mar</time> <span class="what">Episode starts</span></li>
+        <li class="ev edge end" style="--at:100"><time datetime="2026-03-31">31 Mar</time> <span class="what">Episode ends</span></li>
+      </ol>
+      <div class="margin">
+        <h4>Reviewer margin</h4>
+        <ol class="notes">
+          <li class="note" id="f-HA02-D-4">
+            <p class="fid"><span class="tag">HA02</span> <code>HA02:D-4</code></p>
+            <p class="msg">Document D-4 (certification for episode EP-3) has no signature date.</p>
+            <p class="aside">Cites D-4, which has no signature date to place on the strip.</p>
+            <p class="dec">Decision: <span>open</span></p>
+          </li>
+          <li class="note" id="f-HA04-EP-3">
+            <p class="fid"><span class="tag">HA04</span> <code>HA04:EP-3</code></p>
+            <p class="msg">Episode EP-3 billing date 2026-02-28 is 1 calendar day(s) before its start date 2026-03-01.</p>
+            <p class="aside"><a href="#r-EP-3-billing">Show the billing date on the strip</a></p>
+            <p class="dec">Decision: <span>open</span></p>
+          </li>
+        </ol>
+      </div>
+    </article>
+
+    <footer class="exhibit-foot">
+      <p>Values the engine's own tests expect for this fixture: 3 episodes, 6 required pairs, 5 present pairs, 5 documents, 4 findings, 2 affected episodes. Messages above are quoted from the engine's finding templates. Decisions show <code>open</code>, the default before any person reviews a finding.</p>
+    </footer>
+  </section>
+
+  <section class="workflow" id="workflow" aria-labelledby="h-workflow">
+    <h2 id="h-workflow">How a review runs in the workbench</h2>
+    <ol class="steps">
+      <li><span class="num" aria-hidden="true">i</span><h3>Load</h3><p>Choose a bundled synthetic fixture. Validation is atomic: the whole input is accepted, or a list of coded errors comes back and nothing is processed.</p></li>
+      <li><span class="num" aria-hidden="true">ii</span><h3>Inspect</h3><p>Read the episodes, documents and requirements as tables before any rule runs.</p></li>
+      <li><span class="num" aria-hidden="true">iii</span><h3>Run HA-DEMO-1</h3><p>Get a frozen, deterministic report with a chronology strip per episode. The same input gives byte-identical output.</p></li>
+      <li><span class="num" aria-hidden="true">iv</span><h3>Review</h3><p>Open a finding to see its cited records and rule pack provenance. Set a decision and add a note.</p></li>
+      <li><span class="num" aria-hidden="true">v</span><h3>Export</h3><p>Download JSON or CSV. Every export carries its data-origin label and the review layer, kept apart from the frozen findings.</p></li>
+    </ol>
+  </section>
+
+  <section class="rules" id="rules" aria-labelledby="h-rules">
+    <h2 id="h-rules">The four fictional rules</h2>
+    <p class="section-note">HA-DEMO-1 is a demonstration contract written for this project. It is not derived from any regulation.</p>
+    <dl class="rule-list">
+      <div><dt><span class="tag">HA01</span> Required document missing</dt><dd>A required episode and kind pair has no document at all.</dd></div>
+      <div><dt><span class="tag">HA02</span> Document unsigned</dt><dd>A document exists but its signature date is empty.</dd></div>
+      <div><dt><span class="tag">HA03</span> Document signed after billing date</dt><dd>A signature falls on a later calendar day than the episode's billing date. Signing on the billing date itself is not a finding.</dd></div>
+      <div><dt><span class="tag">HA04</span> Billing date before episode start</dt><dd>The episode's billing date is an earlier calendar day than its start date.</dd></div>
+    </dl>
+  </section>
+
+  <section class="decision" aria-labelledby="h-decision">
+    <h2 id="h-decision">The reviewer decides, not the engine</h2>
+    <div class="decision-body">
+      <p>Each finding has one decision from a fixed list. It stays <code>open</code> until a person changes it. A note of up to 2,000 characters can sit beside it. Decisions and notes are stored outside the frozen report, so reviewing never alters the findings.</p>
+      <ul class="vocab" aria-label="Decision vocabulary">
+        <li><code>open</code></li><li><code>confirmed</code></li><li><code>dismissed</code></li><li><code>escalated</code></li>
+      </ul>
+      <p class="small">Notes and decisions live only in the open page until you export them. The workbench does not save them.</p>
+    </div>
+  </section>
+
+  <section class="limits" id="limits" aria-labelledby="h-limits">
+    <h2 id="h-limits">What it does not do</h2>
+    <ul class="not">
+      <li>It makes no clinical, financial, eligibility, entitlement or compliance determination, and shows no monetary figures.</li>
+      <li>It does not interpret Medicare, CMS or any regulator's policy. HA-DEMO-1 is fictional.</li>
+      <li>It does not detect or block real patient data. A local JSON file you open in the workbench is read in your browser, never sent anywhere, and labelled UNVERIFIED USER-SUPPLIED DATA. That label is a disclosure, not a control. Do not use real records.</li>
+      <li>It is not production software. A qualified hospice compliance expert would have to review any authoritative rule pack, and privacy, security and legal approval must come before any real data.</li>
+      <li>Its tests are the implementer's own checks, not an independent audit.</li>
+    </ul>
+  </section>
+
+  <section class="close" aria-labelledby="h-close">
+    <h2 id="h-close">Open the folio yourself</h2>
+    <p>Load the golden fixture, run the rules, and compare the findings with Exhibit A.</p>
+    <a class="cta" href="app/">Open the workbench</a>
+    <p class="cta-note">Synthetic fixtures only. Every result needs human review.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>HospiceAudit demonstration slice. SYNTHETIC DEMO DATA only. HA-DEMO-1 is a fictional documentation contract with no legal, regulatory or clinical authority. Not production software.</p>
+</footer>
+</body>
+</html>
